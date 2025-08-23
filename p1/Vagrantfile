@@ -1,0 +1,42 @@
+LOGIN = ENV.fetch("LOGIN", "mehdi")
+SERVER_HOSTNAME = "#{LOGIN}S"
+AGENT_HOSTNAME = "#{LOGIN}SW"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = true
+  config.vm.box = ENV.fetch("VAGRANT_BOX", "ubuntu/jammy64")
+
+
+
+
+COMMON_SHELL = <<-SHELL
+    set -euxo pipefail
+    sudo swapoff -a || true
+    sudo sed -i.bak -E 's@^([^#].*\\s+swap\\s+)@#\\1@g' /etc/fstab || true
+    sudo apt-get update -y
+    sudo apt-get install -y curl ca-certificates iproute2 iptables
+SHELL
+
+
+
+  config.vm.define "server" do |srv|
+  srv.vm.hostname = SERVER_HOSTNAME
+  srv.vm.network "private_network", ip: "192.168.56.110"
+  srv.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--name", SERVER_HOSTNAME]
+    vb.memory = 1024
+    vb.cpus = 2
+  end
+  srv.vm.provision "shell", inline: COMMON_SHELL
+end
+
+  config.vm.define "agent" do |agt|
+    agt.vm.hostname = AGENT_HOSTNAME
+    agt.vm.network "private_network", ip: "192.168.56.111"
+    agt.vm.provider "virtualbox" do |vb|
+      vb.customize ["modifyvm", :id, "--name", AGENT_HOSTNAME]
+      vb.memory = 1024
+      vb.cpus = 2
+    end
+  end
+end
