@@ -1,42 +1,31 @@
 LOGIN = ENV.fetch("LOGIN", "mehdi")
-SERVER_HOSTNAME = "#{LOGIN}S"
-AGENT_HOSTNAME = "#{LOGIN}SW"
+SERVER_IP = "192.168.56.110"
+WORKER_IP = "192.168.56.111"
 
 Vagrant.configure("2") do |config|
   config.ssh.insert_key = true
-  config.vm.box = ENV.fetch("VAGRANT_BOX", "ubuntu/jammy64")
+  config.vm.box = ENV.fetch("BOX", "ubuntu/jammy64")
+  config.vm.synced_folder ".", "/vagrant", disabled: true
 
-
-
-
-COMMON_SHELL = <<-SHELL
-    set -euxo pipefail
-    sudo swapoff -a || true
-    sudo sed -i.bak -E 's@^([^#].*\\s+swap\\s+)@#\\1@g' /etc/fstab || true
-    sudo apt-get update -y
-    sudo apt-get install -y curl ca-certificates iproute2 iptables
-SHELL
-
-
-
-  config.vm.define "server" do |srv|
-  srv.vm.hostname = SERVER_HOSTNAME
-  srv.vm.network "private_network", ip: "192.168.56.110"
-  srv.vm.provider "virtualbox" do |vb|
-    vb.customize ["modifyvm", :id, "--name", SERVER_HOSTNAME]
-    vb.memory = 1024
-    vb.cpus = 2
-  end
-  srv.vm.provision "shell", inline: COMMON_SHELL
-end
-
-  config.vm.define "agent" do |agt|
-    agt.vm.hostname = AGENT_HOSTNAME
-    agt.vm.network "private_network", ip: "192.168.56.111"
-    agt.vm.provider "virtualbox" do |vb|
-      vb.customize ["modifyvm", :id, "--name", AGENT_HOSTNAME]
+  config.vm.define "#{LOGIN}S" do |srv|
+    srv.vm.hostname = "#{LOGIN}S"
+    srv.vm.network "private_network", ip: SERVER_IP
+    srv.vm.provider "virtualbox" do |vb|
+      vb.name = "#{LOGIN}S"
+      vb.cpus = 1
       vb.memory = 1024
-      vb.cpus = 2
     end
+    srv.vm.provision "shell", path: "scripts/install_k3s_server.sh", args: [SERVER_IP, LOGIN], env: { "K3S_TOKEN" => "IOTSUPERSECRETTOKEN123" }
+  end
+
+  config.vm.define "#{LOGIN}SW" do |agt|
+    agt.vm.hostname = "#{LOGIN}SW"
+    agt.vm.network "private_network", ip: WORKER_IP
+    agt.vm.provider "virtualbox" do |vb|
+      vb.name = "#{LOGIN}SW"
+      vb.cpus = 1
+      vb.memory = 1024
+    end
+    agt.vm.provision "shell", path: "scripts/install_k3s_agent.sh", args: [SERVER_IP, WORKER_IP, LOGIN], env: { "K3S_TOKEN" => "IOTSUPERSECRETTOKEN123" }
   end
 end
